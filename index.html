@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home Iot</title>
+    <style>
+        body {
+            text-align: center;
+            margin: 0 auto;
+            background-color: #222222;
+            color: white;
+        }
+
+        #status button {
+            width: 110px;
+            height: 45px;
+            margin: 10px auto;
+            border-radius: 10px;
+            background-color: #16b416;
+            color: white;
+            border: none;
+        }
+
+        #app {
+            /* border: white solid 1px; */
+            padding: 5px;
+            height: 390px;
+            width: 340px;
+            border-radius: 20px;
+            margin: 0 auto
+        }
+
+        #button {
+            width: 330px;
+            height: 330px;
+            margin: 0 auto;
+        }
+
+        .div_button {
+            float: left;
+            height: 23%;
+            width: 23%;
+            margin: 0 auto;
+            background-color: #3C89BC;
+            border-radius: 10%;
+            outline: none;
+            margin-right: 1%;
+            margin-left: 1%;
+            margin-top: 20px;
+        }
+
+        .div_button a {
+            font-size: 10px;
+        }
+
+        .div_button button {
+            height: 100%;
+            width: 100%;
+            background: none;
+            color: white;
+            font-size: 25px;
+            font-weight: bold;
+            border-radius: 10px;
+            border: none;
+        }
+
+        table {
+            margin-top: 20px;
+        }
+
+        table,
+        th,
+        td {
+            border: white 1px solid;
+            border-collapse: collapse;
+        }
+
+        #btn_them {
+            height: 45px;
+            width: 100px;
+            margin-top: 20px;
+        }
+
+        .networks {
+            text-align: left;
+            margin-top: 10px;
+        }
+
+        a {
+            color: white;
+            font-weight: 500;
+            text-decoration: none;
+
+        }
+
+        /* #upload {
+            display: flex;
+            align-items: flex-end;
+        } */
+
+        .q {
+            height: 16px;
+            margin: 0;
+            padding: 0 5px;
+            text-align: right;
+            min-width: 38px;
+            float: right
+        }
+
+        /* Styles for the modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgb(0, 0, 0);
+            background-color: rgba(0, 0, 0, 0.4);
+            padding-top: 60px;
+            color: black;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 400px;
+        }
+
+        #edit-idbtn {
+            width: 180px;
+            padding: 2px;
+            margin-bottom: 10px;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+
+        .btn-modal {
+            margin: 10px 10px;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="status">
+        <h1>T SmartHome</h1>
+        <button onclick="dieukien()">Điều Khiển</button>
+        <button onclick="caidat()">Cài Đặt</button>
+        <button onclick="networks()">WiFi</button>
+    </div>
+    <div id="app"></div>
+    <div id="editModal" class="modal">
+    </div>
+    <div id="networks" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('networks')">&times;</span>
+            <h5 id="txt-ketnoiwifi"></h5>
+            <input type="text" id="passWifi" placeholder="Nhập mật khẩu"></br>
+            <button class="btn-modal" onclick="ketnoiWifi()">Kết nối</button>
+            <button class="btn-modal" onclick="closeModal('networks')">Đóng</button>
+        </div>
+    </div>
+    </div>
+    <script>
+        var Socket;
+        var messageQueue = [];
+        let JSONobj = {};
+        function sendMessage(message) {
+            if (Socket && Socket.readyState === WebSocket.OPEN) {
+                Socket.send(message);
+            } else {
+                messageQueue.push(message);
+            }
+        }
+
+        window.onload = function () {
+            // Socket = new WebSocket(`ws://${window.location.hostname}:81`);
+            Socket = new WebSocket(`ws://thongiot.dssddns.net:81`);
+            Socket.onmessage = function (event) {
+                JSONobj = JSON.parse(event.data); // Tách dữ liệu json
+                // console.log(event.data);
+                // console.log(JSONobj);
+
+                if (JSONobj.VisuaPin) {
+                    updateButtons(JSONobj.VisuaPin);
+                } else if (JSONobj.networks) {
+                    updatenetworks(JSONobj.networks);
+                } else if (JSONobj.rf) {
+                    updateCaidat(JSONobj.rf);
+                } else if (JSONobj.valuerf) {
+                    document.getElementById('edit-idrf').value = JSONobj.valuerf;
+                }
+            }
+            Socket.onopen = function () {
+                // Gửi tất cả các thông điệp trong hàng đợi khi kết nối sẵn sàng
+                while (messageQueue.length > 0) {
+                    Socket.send(messageQueue.shift());
+                }
+            };
+            dieukien();
+
+        }
+        function dieukien() {
+            var htmlapp = document.getElementById('app');
+            var html = '<div id="button">';
+            for (let i = 1; i <= 32; i++) {
+                html += `
+                        <div id="d${i}" class="div_button">
+                            <a id="txtbtn${i}">Nút ${i}</a>
+                            <button value="1" id="btn${i}" onclick="setbutton(${i})">${i}</button>
+                        </div>`;
+            }
+            html += '</div>';
+            htmlapp.innerHTML = html;
+            // sendMessage('updateRelayPin');
+        }
+        function caidat() {
+            document.getElementById('app').innerHTML = '';
+            Socket.send('updateData');
+            updateCaidat(0);
+        }
+        function updateCaidat(data) {
+            var htmlapp = document.getElementById('app');
+            var html = '<table id="myTable"><thead><tr><th>ID RF</th><th>Name RF</th><th>ID Button</th><th>Name Button</th><th>Actions</th></tr></thead><tbody>';
+            if (data) {
+
+                data.forEach((s, i) => {
+                    html += '<tr><td>' + s.idRF + '</td><td> ' + s.nameRF + '</td><td>' + s.idBtn + '</td><td>' + s.nameBtn + '</td><td><button class="editBtn">sửa</button><button class="deleteBtn">xóa</button></td></tr>';
+                });
+            }
+            html += '</tbody></table><button id="btn_them" onclick="openAddModal()">Thêm</button><table><tr><th style="width: 100px;">ID</th><th>Name</th><th></th></tr>';
+            var btnmane = JSONobj.VisuaPin;
+            btnmane.forEach((item, index) => {
+                html += `<tr><td>${index}</td><td><input type="text" value="${item.PinName}" style="padding: 5px;width: 200px"></td><td><button class="saveBtn"style="padding: 8px;margin: 2px 10px 2px 10px;">lưu</button></td></tr>`;
+            });
+            html += '</table>';
+            htmlapp.innerHTML = html;
+            attachTableEvents(); // Gán sự kiện cho các nút sau khi tạo bảng
+        }
+        function networks() {
+            document.getElementById('app').innerHTML = '';
+            Socket.send('updateWiFi');
+        }
+        function ketnoiWifi() {
+            var ssid = document.getElementById('txt-ketnoiwifi').value;
+            var pass = document.getElementById('passWifi').value;
+            Socket.send(`{"networks":{"ssid":"${ssid}","pass":"${pass}"}}`);
+            closeModal("networks");
+        }
+        function updatenetworks(data) {
+            var htmlapp = document.getElementById('app');
+            var html = '';
+            data.forEach((item, imdex) => {
+                html += `<div class="networks"><a href="#p" onclick="handleAClick('${item.name}')">${item.name}</a><div class="q">${item.signal}</div></div>`;
+            });
+            html += '<div id="upload"><a href="update">upload File of Firmware</a></div>'
+            htmlapp.innerHTML = html;
+        }
+        function attachTableEvents() {
+            document.querySelectorAll('.editBtn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const row = e.target.closest('tr');
+                    currentEditRow = row; // Lưu trữ hàng hiện tại để chỉnh sửa
+                    const idrf = row.children[0].textContent;
+                    const namerf = row.children[1].textContent;
+                    const idbtn = row.children[2].textContent;
+                    const namebtn = row.children[3].textContent;
+
+                    // Hiển thị modal và điền thông tin hiện tại vào form
+                    document.getElementById('edit-idrf').value = idrf;
+                    document.getElementById('edit-namerf').value = namerf;
+                    document.getElementById('edit-idbtn').value = idbtn;
+                    document.getElementById('edit-namebtn').value = namebtn;
+                    document.getElementById('editModal').style.display = 'block';
+                });
+            });
+
+            document.querySelectorAll('.saveBtn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const row = e.target.closest('tr');
+                    currentEditRow = row; // Lưu trữ hàng hiện tại để chỉnh sửa
+                    const idPin = row.children[0].textContent;
+                    const inputElement = row.children[1].querySelector('input');
+                    const namePin = inputElement.value;
+                    console.log(`${idPin}:${namePin}`);
+
+                });
+            });
+
+            document.querySelectorAll('.deleteBtn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const row = e.target.closest('tr');
+                    const id = row.children[0].textContent;
+                    Socket.send(`{"deleteBtn":${id}}`);
+                    // console.log(`Deleting row with ID: ${id}`);
+                });
+            });
+        }
+        function openAddModal() {
+            Socket.send('hoclenh');
+            var ss = document.getElementById('editModal');
+            var html = "<div class='modal-content'><span class='close' onclick='closeModal(\"editModal\")'>&times;</span><h2>Edit Button</h2><form id='editForm'><label for='edit-idrf'>ID RF:</label><br><input type='text' id='edit-idrf' name='idrf'><br><label for='edit-namerf'>Name RF:</label><br><input type='text' id='edit-namerf' name='namerf'><br><label for='edit-idbtn'>ID Button:</label><br><select id='edit-idbtn' name='idbtn'>";
+
+            var btnmane = JSONobj.VisuaPin;
+            btnmane.forEach((item, index) => {
+                html += `<option value='${index}'>-${index}: ${item.PinName}</option>`;
+            });
+
+            html += "</select><br><button type='button' onclick='saveChanges()'>Save</button><button type='button' onclick='closeModal(\"editModal\")'>Cancel</button></form></div>";
+
+            ss.innerHTML = html;
+            ss.style.display = 'block';
+
+        }
+
+        function closeModal(modalId) {
+            Socket.send('endhoclenh');
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        function saveChanges() {
+            const idrf = document.getElementById('edit-idrf').value;
+            const namerf = document.getElementById('edit-namerf').value;
+            const idbtn = document.getElementById('edit-idbtn').value;
+            var root = `{"rf":{"idrf":${idrf},"namerf":"${namerf}","idbtn":${idbtn}}}`;
+            closeModal("editModal");
+            Socket.send(root);
+        }
+        function updateButtons(data) {
+            data.forEach((item, index) => {
+                var btnIndex = index + 1;
+                document.getElementById(`txtbtn${btnIndex}`).innerHTML = item.PinName;
+                if (item.PinStatus) {
+                    btnon(btnIndex);
+                } else {
+                    btnoff(btnIndex);
+                }
+            });
+        }
+        function handleAClick(ssidname) {
+            document.getElementById('networks').style.display = 'block';
+            document.getElementById('txt-ketnoiwifi').innerHTML = `Kết nối với"${ssidname}"`
+            document.getElementById('txt-ketnoiwifi').value = ssidname;
+            console.log(ssidname);
+        }
+        function btnon(n) {
+            document.getElementById("btn" + n).value = "ON";
+            document.getElementById("btn" + n).innerHTML = "ON";
+            document.getElementById("d" + n).style.background = "#00c700";
+        }
+
+        function btnoff(n) {
+            document.getElementById("btn" + n).value = "OFF";
+            document.getElementById("btn" + n).innerHTML = "OFF";
+            document.getElementById("d" + n).style.background = "red";
+        }
+        function setbutton(i) {
+            var btn = document.getElementById(`btn${i}`).value;
+            let root = {
+                setValue: {
+                    Pinid: null,
+                    PinValue: null
+                }
+            };
+            root.setValue.Pinid = `${i}`;
+            root.setValue.PinValue = (btn === "OFF"); // Gán `true` nếu `btn` là "ON", ngược lại `false`
+            Socket.send(JSON.stringify(root));
+        }
+    </script>
+</body>
+
+</html>
